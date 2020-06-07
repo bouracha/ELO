@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime
 
 def update(rating1, rating2, score):
-    K = 40
+    K = 100
 
     score1 = score
     score2 = 1 - score
@@ -21,8 +21,17 @@ def update(rating1, rating2, score):
         prob_of_1_winning = probabilityOfWeakerPlayerWinning
         prob_of_2_winning = probabilityOfStrongerPlayerWinning
 
-    newRating1 = (score1 - prob_of_1_winning) * K + rating1
-    newRating2 = (score2 - prob_of_2_winning) * K + rating2
+    print("Probability of White winning: {:.5f}".format(prob_of_1_winning))
+    rating_change1 = (score1 - prob_of_1_winning)*K
+    rating_change2 = (score2 - prob_of_2_winning)*K
+
+    if np.abs(rating_change1) < 1:
+        rating_change1 = rating_change1/np.abs(rating_change1)
+    if np.abs(rating_change2) < 1:
+        rating_change2 = rating_change2/np.abs(rating_change2)
+
+    newRating1 = rating1 + rating_change1
+    newRating2 = rating2 + rating_change2
 
     return round(newRating1), round(newRating2)
 
