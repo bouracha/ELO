@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime
 
 def update(rating1, rating2, score):
-    K = 100
+    K = 40
 
     score1 = score
     score2 = 1 - score
