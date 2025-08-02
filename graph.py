@@ -22,10 +22,12 @@ def plot_rating(path_to_file, label):
 
   time_list = []
   valid_ratings = []
+  starting_rating = None
   
   for i, ts in enumerate(timestamp):
     if ts == "beginning of time":
-      # Skip the initial "beginning of time" entry
+      # Store the starting rating but don't add to timeline yet
+      starting_rating = rating[i]
       continue
     else:
       try:
@@ -38,9 +40,9 @@ def plot_rating(path_to_file, label):
         continue
 
   if time_list:  # Only plot if we have valid data
-    return time_list, valid_ratings, label[:-4]
+    return time_list, valid_ratings, label[:-4], starting_rating
   else:
-    return [], [], label[:-4]
+    return [], [], label[:-4], starting_rating
 
 
 # Collect all data first
@@ -52,11 +54,11 @@ player_data = {}  # Store each player's data separately
 print("Number of datasets: ", len(sys.argv)-1)
 for i in range(1, len(sys.argv)):
   dataset = sys.argv[i]
-  times, ratings, label = plot_rating(dataset, dataset)
+  times, ratings, label, starting_rating = plot_rating(dataset, dataset)
   all_times.extend(times)
   all_ratings.extend(ratings)
   all_labels.extend([label] * len(times))
-  player_data[label] = (times, ratings)
+  player_data[label] = (times, ratings, starting_rating)
 
 # Plot all data
 if all_times:
@@ -106,18 +108,22 @@ if all_times:
         all_requested_players.append(player_name)
     
     # Plot active players first
-    for i, (label, (times, ratings)) in enumerate(player_data.items()):
+    for i, (label, (times, ratings, starting_rating)) in enumerate(player_data.items()):
         if times:  # Player has games
             color = colors[i % len(colors)]
             
-            # Add starting point at first game time if player wasn't in first game
-            if times[0] != first_game_time:
-                # Insert starting rating at first game time
+            # Check if this player was in the first game
+            was_in_first_game = times[0] == first_game_time
+            
+            if was_in_first_game:
+                # Player was in the first game - add their starting rating at first game time
                 times_with_start = [first_game_time] + times
-                ratings_with_start = [1200.0] + ratings  # Starting rating
+                ratings_with_start = [starting_rating] + ratings
             else:
-                times_with_start = times
-                ratings_with_start = ratings
+                # Player wasn't in the first game - add a starting point at first game time
+                # This creates a flat line from first game time to their first actual game
+                times_with_start = [first_game_time] + times
+                ratings_with_start = [starting_rating] + ratings
             
             # Add ending point at last game time if player's last game wasn't the most recent
             if times_with_start[-1] != last_game_time:
@@ -128,17 +134,33 @@ if all_times:
                 times_with_end = times_with_start
                 ratings_with_end = ratings_with_start
             
+            # Check if this player has been inactive (no recent games)
+            is_inactive = times_with_start[-1] != last_game_time
+            
             # Convert to matplotlib dates
             mpl_times = [mdates.date2num(t) for t in times_with_end]
             # Extract just the player name from the label (remove path) and capitalize
             player_name = label.split('/')[-1] if '/' in label else label
             player_name = player_name.capitalize()
-            plt.plot(mpl_times, ratings_with_end, '-o', label=player_name, color=color, linewidth=2.5, markersize=6, markerfacecolor=color, markeredgecolor='white', markeredgewidth=1.5)
+            
+            # Plot the line first (make inactive players more transparent)
+            alpha = 0.7 if is_inactive else 1.0
+            plt.plot(mpl_times, ratings_with_end, '-', label=player_name, color=color, linewidth=2.5, alpha=alpha)
+            
+            # Plot dots at all key points (start, each game, end)
+            plt.plot(mpl_times, ratings_with_end, 'o', color=color, markersize=8, markerfacecolor=color, markeredgecolor='white', markeredgewidth=2, alpha=alpha)
     
-    # Plot inactive players
+    # Plot inactive players (only those who have no games at all)
     inactive_count = 0
     for player in all_requested_players:
-        if player not in player_data or not player_data[player][0]:  # No games
+        # Check if this player has any games by looking for their data in player_data
+        player_has_games = False
+        for label in player_data.keys():
+            if player in label:  # Check if player name is in the label
+                player_has_games = True
+                break
+        
+        if not player_has_games:  # Only plot if player has no games
             # Get their last rating from the CSV file
             try:
                 data = pd.read_csv(f"chess/{player}.csv")
@@ -153,7 +175,12 @@ if all_times:
             # Convert to matplotlib dates
             mpl_times = [mdates.date2num(t) for t in times_flat]
             color = colors[(len(player_data) + inactive_count) % len(colors)]
-            plt.plot(mpl_times, ratings_flat, '--', label=player, color=color, linewidth=2, alpha=0.7, markersize=4)
+            
+            # Plot the dashed line first
+            plt.plot(mpl_times, ratings_flat, '--', label=player, color=color, linewidth=2, alpha=0.7)
+            
+            # Plot dots at start and end points
+            plt.plot(mpl_times, ratings_flat, 'o', color=color, markersize=6, markerfacecolor=color, markeredgecolor='white', markeredgewidth=1.5, alpha=0.7)
             inactive_count += 1
 
 plt.ylabel("Rating", fontsize=14, fontweight='bold')

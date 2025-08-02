@@ -3,13 +3,13 @@
 
 - To Submit results:
 ```python
-python3 main.py --game "chess" --player1 "dean" --player2 "dad" --score 0.0
+python3 main.py --game "chess" --player1 "dean" --player2 "eid" --score 0.0
 ```
 where player1 is considered white, and score is the score from perspective of player1 (ie 0.0 means player1 lost).
 
 - To graph rating progression use:
 ```python
-python3 graph.py "chess/mum.csv" "chess/dad.csv" "chess/anthony.csv" "chess/dean.csv"
+python3 graph.py "chess/eid.csv" "chess/anthony.csv" "chess/dean.csv"
 ```
 where the resulting graph will be ratings.png.
 
