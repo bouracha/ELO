@@ -54,6 +54,14 @@ def read_ratings(player1, player2, game='chess'):
     return rating1, rating2
 
 def make_new_player(player_name='default', game='chess'):
-    head = np.array(['rating', 'opponent', 'result', 'colour', 'timestamp'])
-    df = pd.DataFrame(np.array(np.expand_dims((1200.0, 'no opponent', 0, 'no colour', 'beginning of time'), axis=0)))
-    df.to_csv(str(game)+'/'+str(player_name) + '.csv', header=head, index=False)
+    import os
+    file_path = str(game)+'/'+str(player_name) + '.csv'
+    
+    # Only create new player if file doesn't exist
+    if not os.path.exists(file_path):
+        head = np.array(['rating', 'opponent', 'result', 'colour', 'timestamp'])
+        df = pd.DataFrame(np.array(np.expand_dims((1200.0, 'no opponent', 0, 'no colour', 'beginning of time'), axis=0)))
+        df.to_csv(file_path, header=head, index=False)
+        print(f"Created new player '{player_name}' for game '{game}'")
+    else:
+        print(f"Player '{player_name}' already exists for game '{game}' - skipping creation")
