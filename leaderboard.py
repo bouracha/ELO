@@ -34,6 +34,30 @@ def add_medal_image(ax, x, y, position, size=0.04):
         ax.text(x, y, f"{position}", fontsize=12, fontweight='bold', ha='center', va='center', 
                 color='#333333', bbox=dict(boxstyle="circle,pad=0.3", facecolor='gold' if position==1 else 'silver' if position==2 else '#CD7F32'))
 
+def add_player_image(ax, x, y, player_name, size=0.06):
+    """Add a player image from the images/players/ folder"""
+    try:
+        player_image_path = f"images/players/{player_name}.png"
+        
+        if os.path.exists(player_image_path):
+            # Load and add the player image
+            img = plt.imread(player_image_path)
+            imagebox = OffsetImage(img, zoom=size)
+            ab = AnnotationBbox(imagebox, (x, y), frameon=False)
+            ax.add_artist(ab)
+        else:
+            # If no image exists, add a placeholder circle
+            circle = plt.Circle((x, y), size*0.5, facecolor='#CCCCCC', edgecolor='#999999', linewidth=2)
+            ax.add_patch(circle)
+            ax.text(x, y, "?", fontsize=10, fontweight='bold', ha='center', va='center', color='#666666')
+            
+    except Exception as e:
+        print(f"Could not load player image for {player_name}: {e}")
+        # Fallback to placeholder circle
+        circle = plt.Circle((x, y), size*0.5, facecolor='#CCCCCC', edgecolor='#999999', linewidth=2)
+        ax.add_patch(circle)
+        ax.text(x, y, "?", fontsize=10, fontweight='bold', ha='center', va='center', color='#666666')
+
 def get_current_ratings(game_folder):
     """Get current ratings for all players in a game folder"""
     ratings = {}
@@ -87,8 +111,12 @@ def create_leaderboard(game_folder, excluded_players=None, title=None):
         print(f"No players remaining after exclusions in {game_folder}")
         return
     
-    # Sort players by rating (highest first)
-    sorted_players = sorted(filtered_ratings.items(), key=lambda x: x[1], reverse=True)
+    # Sort players: first by whether they've played games, then by rating
+    # Players who have played games come first, sorted by rating (highest first)
+    # Players who haven't played games come last, also sorted by rating (highest first)
+    sorted_players = sorted(filtered_ratings.items(), 
+                          key=lambda x: (has_played[x[0]], x[1]), 
+                          reverse=True)
     
     # Create the plot with a clean, simple design
     fig, ax = plt.subplots(figsize=(8, 6))
@@ -143,6 +171,9 @@ def create_leaderboard(game_folder, excluded_players=None, title=None):
         # Add player name
         ax.text(0.35, y_pos, player.capitalize(), fontsize=14, fontweight='bold', ha='left', va='center')
         
+        # Add player image (on the right side of the name)
+        add_player_image(ax, 0.65, y_pos, player)
+        
         # Add rating
         ax.text(0.85, y_pos, f"{int(rating):>4d}", fontsize=14, fontweight='bold', ha='right', va='center')
     
@@ -157,7 +188,7 @@ def create_leaderboard(game_folder, excluded_players=None, title=None):
     plt.tight_layout()
     
     # Save the leaderboard
-    output_file = f'{game_folder}_leaderboard.png'
+    output_file = f'web/{game_folder}_leaderboard.png'
     plt.savefig(output_file, dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
     plt.close()
     

@@ -7,6 +7,7 @@ make_new_player("eve", "chess")
 make_new_player("gavin", "chess")
 make_new_player("frankie", "chess")
 make_new_player("oliver", "chess")
+make_new_player("grace", "chess")
 
 make_new_player("anthony", "pingpong")
 make_new_player("eid", "pingpong")

@@ -11,6 +11,15 @@ plt.rcParams['font.size'] = 12
 plt.rcParams['axes.grid'] = True
 plt.rcParams['grid.alpha'] = 0.3
 
+def get_middle_rating(times, ratings):
+    """Get the rating at the middle of the time series"""
+    if len(times) == 0:
+        return None
+    
+    # Get the middle index
+    middle_index = len(times) // 2
+    return times[middle_index], ratings[middle_index]
+
 name = sys.argv[0]
 
 def plot_rating(path_to_file, label):
@@ -67,33 +76,26 @@ if all_times:
     
     # Find the very first game time across all players
     first_game_time = min(all_times)
+    last_game_time = max(all_times)
+    
+    # Calculate the center of the time axis
+    time_center = first_game_time + (last_game_time - first_game_time) / 2
     
     # Determine time scale automatically
-    time_span = max(all_times) - min(all_times)
+    time_span = last_game_time - first_game_time
     
     # Determine game type from the first argument
     game_type = sys.argv[1].split('/')[0].title()
     
-    if time_span.days == 0:
-        # Same day - show hours
-        plt.xlabel("Time")
-        plt.title(f"{game_type} - Today's games")
-        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
-    elif time_span.days < 7:
-        # Less than a week - show days
-        plt.xlabel("Time")
-        plt.title(f"{game_type} - This week's games")
-        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
-    elif time_span.days < 30:
-        # Less than a month - show days
-        plt.xlabel("Time")
-        plt.title(f"{game_type} - This month's games")
-        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
-    else:
-        # More than a month - show dates
-        plt.xlabel("Time")
-        plt.title(f"{game_type} - All time")
-        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+    # Count total games across all players
+    total_games = 0
+    for player, (times, ratings, starting_rating) in player_data.items():
+        # Subtract 1 from each player's game count to exclude the "beginning of time" entry
+        total_games += max(0, len(times) - 1)
+    
+    plt.xlabel("Time")
+    plt.title(f"{game_type} ({total_games} total games)")
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
     
     # Define a nice color palette
     colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
@@ -107,7 +109,12 @@ if all_times:
         player_name = arg.split('/')[-1].replace('.csv', '')
         all_requested_players.append(player_name)
     
+    # Count total players for name positioning
+    total_players = len(player_data) + sum(1 for player in all_requested_players 
+                                         if player not in player_data or not player_data[player][0])
+    
     # Plot active players first
+    player_index = 0
     for i, (label, (times, ratings, starting_rating)) in enumerate(player_data.items()):
         if times:  # Player has games
             color = colors[i % len(colors)]
@@ -145,10 +152,19 @@ if all_times:
             
             # Plot the line first (make inactive players more transparent)
             alpha = 0.7 if is_inactive else 1.0
-            plt.plot(mpl_times, ratings_with_end, '-', label=player_name, color=color, linewidth=2.5, alpha=alpha)
+            plt.plot(mpl_times, ratings_with_end, '-', color=color, linewidth=2.5, alpha=alpha)
             
-            # Plot dots at all key points (start, each game, end)
+                        # Plot dots at all key points (start, each game, end)
             plt.plot(mpl_times, ratings_with_end, 'o', color=color, markersize=8, markerfacecolor=color, markeredgecolor='white', markeredgewidth=2, alpha=alpha)
+            
+            # Add player name at the middle of their line
+            if len(mpl_times) > 0:
+                middle_x, middle_y = get_middle_rating(mpl_times, ratings_with_end)
+                if middle_x is not None:
+                    # Place text above the line
+                    plt.annotate(player_name, xy=(middle_x, middle_y), xytext=(5, 15), 
+                                textcoords='offset points', fontsize=20, fontweight='bold',
+                                color=color, alpha=alpha, ha='left', va='bottom')
     
     # Plot inactive players (only those who have no games at all)
     inactive_count = 0
@@ -177,10 +193,21 @@ if all_times:
             color = colors[(len(player_data) + inactive_count) % len(colors)]
             
             # Plot the dashed line first
-            plt.plot(mpl_times, ratings_flat, '--', label=player, color=color, linewidth=2, alpha=0.7)
+            plt.plot(mpl_times, ratings_flat, '--', color=color, linewidth=2, alpha=0.7)
             
             # Plot dots at start and end points
             plt.plot(mpl_times, ratings_flat, 'o', color=color, markersize=6, markerfacecolor=color, markeredgecolor='white', markeredgewidth=1.5, alpha=0.7)
+            
+            # Add player name at a smart position along the line
+            if len(mpl_times) > 0:
+                # Find position for the name based on player index
+                best_x, best_y = find_name_position(mpl_times, ratings_flat, player_index, total_players, mdates.date2num(time_center))
+                if best_x is not None:
+                    # Place text above the line with vertical offset
+                    plt.annotate(player.capitalize(), xy=(best_x, best_y), xytext=(5, 15), 
+                               textcoords='offset points', fontsize=20, fontweight='bold',
+                               color=color, alpha=0.7, ha='left', va='bottom')
+                player_index += 1
             inactive_count += 1
 
 plt.ylabel("Rating", fontsize=14, fontweight='bold')
@@ -191,12 +218,11 @@ plt.xlabel(current_xlabel, fontsize=14, fontweight='bold')
 current_title = plt.gca().get_title()
 plt.title(current_title, fontsize=16, fontweight='bold', pad=20)
 
-# Improve legend
-plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0., fontsize=11, frameon=True, fancybox=True, shadow=True)
+# No legend needed since names are on the lines
 
 # Add some padding and improve layout
 plt.tight_layout()
 
-# Save with high quality
-plt.savefig('rating.png', dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
+# Save with high quality in web folder with game name
+plt.savefig(f'web/{game_type.lower()}_rating.png', dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
 plt.close()  # Close the figure to free memory
